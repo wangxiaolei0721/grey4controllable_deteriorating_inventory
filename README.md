@@ -1,6 +1,6 @@
 # Matlab codes for paper
 
-# Xiaolei Wang, Naiming Xie, yanglu, Yuquan Wang. Grey system modeling for deteriorating inventory. Submitted to Applied Mathematical Modelling
+# Xiaolei Wang, Naiming Xie, yanglu, Yuquan Wang. Grey forecasting modelling and optimization decision-making for deteriorating inventory with controllable decay. Submitted to Engineering Applications of Artificial Intelligence
 
 # Written by Xiaolei Wang
 
