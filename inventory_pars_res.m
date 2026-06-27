@@ -1,71 +1,66 @@
-function inventory_pars_res = inventory_pars_res(time0,time_train,xi_vector_train,p_vector_train,Q_vector_train,demand_train,level_train,weight,inventory_pars)
+function inventory_pars_res = inventory_pars_res(time_t0_train,xi_train,demand_train,level_diff_train,level_train,weight,inventory_pars)
 % Iteratively Reweighed Least Squares algorithm
 % input parameter:
-% time0: the time of order arrival
-% time_train: the sample time
-% p_vector_train: the price vector
-% Q_vector_train: order quantity vector
+% time_t0_train: the sample time, including time0
+% xi_train: preservation investment
 % demand_train: the demand
+% level_diff_train: simulated inventory changes
 % level_train: the inventory levels
 % weight_initial: initial weight
-% inventory pars: lambda, rho
+% inventory pars: lambda, eta, rho
 % output:
 % inventory_pars_res: the inventory residual and the demand residual
 
+% output parameter:
+% inventory pars: lambda, eta, rho
 
 
 % number of orders
-cell_length=length(time_train);
+cell_length=length(time_t0_train);
 % deterioration pars
-lambda0=inventory_pars(1);
-rho=inventory_pars(2);
+lambda = inventory_pars(1);
+eta = inventory_pars(2);
+rho = inventory_pars(3);
 %
-Y_inventory=[];
-Y_inventory_fit=[];
+inventory_diff =[];
+inventory_fit=[];
 % demand equation
 E_vector=[];
-P_vector=[];
 demand=[];
+delta_time=[];
 for i = 1:cell_length
-    Q=Q_vector_train(i);
-    level=level_train{i};
-    Level_Q=[Q;level];
-    I1_cumsum=cumsum(Level_Q(1:end-1,1));
-    I2_cumsum=cumsum(Level_Q(2:end,1));
-    Level_cum=1/2*I1_cumsum+1/2*I2_cumsum;  % accumulative series
+    time_t0_i= time_t0_train{i};
+    time_1f1_i =0.5*(time_t0_i(1:(end-1))+time_t0_i(2:end));
+    time_i_diff=diff(time_t0_i);
+    level_diff_i=level_diff_train{i};
+    level_i = level_train{i};
     % inventory equation
-    demand_i=demand_train{i};
-    g_integral=cumsum(demand_i);
-    y_inventory=level-Q+g_integral;
-    lambda = lambda0*exp(-rho*xi_vector_train(i));
-    y_inventory_fit=-lambda*Level_cum;
-    Y_inventory=[Y_inventory;y_inventory];
-    % 
-    Y_inventory_fit=[Y_inventory_fit;y_inventory_fit];
+    delta_time=[delta_time;time_i_diff];
+    inventory_diff=[inventory_diff;level_diff_i];
+    inventory_i=0.5*(level_i(2:end)+level_i(1:(end-1))); % 0.5*(level_i(2:end)+level_i(1:end-1));
+    theta_t_i = lambda*eta*exp(-rho*xi_train(i))*(time_1f1_i).^(eta-1);
+    inventory_fit_i=-theta_t_i.*inventory_i;
+    inventory_fit=[inventory_fit;inventory_fit_i];
     % demand equation
-    time_i=[time0;time_train{i}];
-    time_i_j=time_i(2:end);
-    time_i_j1=time_i(1:end-1);
-    E_i=lambda\(exp(-lambda*(time_i_j1-time0))-exp(-lambda*(time_i_j-time0)));
-    P_i=-p_vector_train(i)*E_i;
+    demand_i=demand_train{i};
+    E_i=exp(-lambda*exp(-rho*xi_train(i)).*(time_1f1_i).^eta);
     % prepare estimate matrix
     E_vector=[E_vector;E_i];
-    P_vector=[P_vector;P_i];
     demand=[demand;demand_i];
 end
 
 
+inventory = inventory_diff+demand;
 % inventory residual
-inventory_res =  weight(2)*(Y_inventory-Y_inventory_fit);
+inventory_res =  weight(2)*(inventory-inventory_fit.*delta_time);
 % demand equation error
 % least squares
-H_lambda=[E_vector,P_vector];
-demand_par=(H_lambda'*H_lambda)\H_lambda'*demand;
+H_par=E_vector;
+demand_par=(H_par'*H_par)\H_par'*demand;
 % residual
-demand_residual =  weight(1)*(demand-H_lambda*demand_par);
+demand_residual =  weight(1)*(demand-H_par*demand_par);
 %
 inventory_pars_res=[inventory_res;demand_residual];
-
 
 end
 

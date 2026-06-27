@@ -1,11 +1,9 @@
-function [time_simu,demand_simu,level_simu] = inventory_level_simulation(alpha,beta,p,std_dev,lambda0,rho,xi,time0,delta_t,Q)
+function [time_simu,demand_simu,level_diff_simu,level_simu] = inventory_level_simulation(d,std_dev,lambda,eta,rho,xi,time0,delta_t,Q)
 % simulate inventory levels and inventory changes
 % input parameter:
-% alpha: basic demand
-% beta: price sensitivity coefficient
-% p: price
+% d: basic demand
 % std_dev: standard deviation of error in demand regression equation
-% lambda0: natural deteriorating rate
+% lambda,eta:  Weibull pars
 % rho: parameters in the reduced deterioration rate ratio function
 % xi: preservation cost
 % time0: the time of order arrival
@@ -14,14 +12,14 @@ function [time_simu,demand_simu,level_simu] = inventory_level_simulation(alpha,b
 % output parameter:
 % time_simu: simulated sampling time
 % demand_simu: simulated demand quantity
+% level_diff_simu: simulated inventory change
 % level_simu: simulated inventory level
 
 
-% actual deterioration rate
-lambda=lambda0*exp(-rho*xi);
 % initial inventory data
 time_simu=[];
 demand_simu=[];
+level_diff_simu = [];
 level_simu = [];
 % initial inventory level
 level_remain=Q;
@@ -29,23 +27,29 @@ level_remain=Q;
 time_k1=time0;
 % record t_k
 time_k=time_k1+delta_t;
+
+
 % demand quantity
-demand = lambda\(alpha-beta*p)*(exp(-lambda.*(time_k1-time0))-exp(-lambda.*(time_k-time0)));
+demand = d*(exp(-lambda*exp(-rho*xi).*((time_k1+time_k)/2)^eta));
+% disp(demand)
 % keep demand >0
 demand_error = delta_t*demand + std_dev*randn;
 while demand_error<0
     % demand with error = demand + random error
     demand_error = delta_t*demand + std_dev*randn;
 end
+% actual deterioration rate
+theta_t = lambda * eta * ((0.5*time_k+0.5*time_k1)-time0) ^(eta - 1)  *exp(-rho*xi);
+% disp(theta_t)
 % deteriorating quantity
-deterioration=lambda*(0.5*levelattime(alpha,beta,p,lambda0,rho,xi,time_k,time0,Q) ...
-    +0.5*levelattime(alpha,beta,p,lambda0,rho,xi,time_k1,time0,Q));
+deterioration=theta_t*levelattime(d,lambda,eta,rho,xi,0.5*time_k+0.5*time_k1,time0,Q);
 % reduction expectation
 deterioration_poissrnd = poissrnd(delta_t*(deterioration));
 while deterioration_poissrnd == 0
     % reduction expectation
     deterioration_poissrnd = poissrnd(delta_t*(deterioration));
 end
+% disp(deterioration_poissrnd)
 % random reduction
 reduction=deterioration_poissrnd+demand_error;
 % level remain = level remain - random reduction
@@ -56,27 +60,35 @@ while level_remain > 0
     demand_simu=[demand_simu;demand_error];
     % store inventory level and changes
     level_simu=[level_simu;level_remain];
+    level_diff_simu = [level_diff_simu;-reduction];
     % update t_{k-1}
     time_k1=time_k;
     % update t_{k}
     time_k=time_k+delta_t;
     % demand quantity
-    demand = lambda\1*(alpha-beta*p)*(exp(-lambda.*(time_k1-time0))-exp(-lambda.*(time_k-time0)));
+    demand = d*(exp(-lambda*exp(-rho*xi).*((time_k1+time_k)/2)^eta));
+    % disp(demand)
     % demand with error = demand + random error
     demand_error = demand + std_dev*randn; % 
     while demand_error<0
         demand_error = demand + std_dev*randn;
     end
+    % actual deterioration rate
+    theta_t = lambda * eta * ((0.5*time_k+0.5*time_k1)-time0) ^(eta - 1)  *exp(-rho*xi);
+    % disp(theta_t)
     % deteriorating quantity
-    deterioration=lambda*(0.5*levelattime(alpha,beta,p,lambda0,rho,xi,time_k,time0,Q) ...
-        +0.5*levelattime(alpha,beta,p,lambda0,rho,xi,time_k1,time0,Q));
+    % When the actual I (t) is 0, it must be stopped, otherwise det will be 0 later, which does not conform to the model assumption
+    deterioration=theta_t*levelattime(d,lambda,eta,rho,xi,0.5*time_k+0.5*time_k1,time0,Q);
+    if deterioration==0
+        break;
+    end
     % reduction expectation
-    % disp(delta_t*(deterioration))
     deterioration_poissrnd = poissrnd(delta_t*(deterioration));
-    % while deterioration_poissrnd == 0
-    %     % reduction expectation
-    %     deterioration_poissrnd = poissrnd(delta_t*(deterioration));
-    % end
+    while deterioration_poissrnd == 0
+        % reduction expectation
+        deterioration_poissrnd = poissrnd(delta_t*(deterioration));
+    end
+    % disp(deterioration_poissrnd)
     % random reduction
     reduction=deterioration_poissrnd+demand_error;
     % level remain = level remain - random reduction

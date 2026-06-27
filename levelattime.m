@@ -1,13 +1,10 @@
-function level = levelattime(alpha,beta,p,lambda0,rho,xi,time,time0,Q)
+function level = levelattime(d,lambda,eta,rho,xi,time,time0,Q)
 % calculate inventory levels at a specific time
 % input parameter:
-% alpha: basic demand
-% beta: price sensitivity coefficient
-% p: price
-% lambda0: natural deteriorating rate
-% rho: parameters in the reduced deterioration rate ratio function
+% d: basic demand
+% lambda, eta: Weibull pars
+% rho: sensitivity coefficient of preservation investment
 % xi: preservation cost
-% time: sampling time
 % time0: the time of order arrival
 % delta_t: the time resolution
 % Q: the order quantity
@@ -15,11 +12,12 @@ function level = levelattime(alpha,beta,p,lambda0,rho,xi,time,time0,Q)
 % level: inventory level
 
 
-lambda=lambda0*exp(-rho*xi);
 % calculate order cycle based on order quantity
-T=Q/(alpha-beta*p);
+T=Q/d;
 % the moment when the inventory drops to 0
 tT=time0+T;
-level=(alpha-beta*p)*exp(-lambda*(time-time0)).*(tT-time);
+% equation
+level=d*exp(-lambda * exp(-rho*xi) * (time-time0).^eta).*(tT-time);
+
 
 end
